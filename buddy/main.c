@@ -73,11 +73,20 @@
 
 int main( void )
 {
-    /* Initial setup of a dummy physical memory layout */
+    /*
+     * Initial setup of a dummy physical memory layout:
+     * 
+     * Zone 0:  0x0000000000000000 -> 0x000000000009FBFF: Reserved - 654336 B
+     * Zone 1:  0x000000000009FC00 -> 0x000000000009FFFF: Reserved - 1024 B
+     * Zone 2:  0x00000000000F0000 -> 0x00000000000FFFFF: Reserved - 65536 B
+     * Zone 3:  0x0000000000100000 -> 0x00000000001A0FFF: Usable   - 659456 B
+     * Zone 4:  0x000000003FFF0000 -> 0x000000003FFFFFFF: ACPI     - 65536 B
+     */
     Buddy_Setup_Memory();
     Buddy_Setup_Buddies();
     Buddy_Debug_PrintBuddies( 3 );
     
+    /*
     {
         uint64_t p1;
         uint64_t p2;
@@ -150,8 +159,10 @@ int main( void )
         
         printf( "--------------------------------------------------------------------------------\n" );
     }
+    */
     
-    XEOS_Mem_AllocPages( 65 );
+    XEOS_Mem_AllocPages( 32 );
+    XEOS_Mem_AllocPages( 32 );
     
     return 0;
 }

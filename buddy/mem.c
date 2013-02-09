@@ -97,9 +97,10 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
     
     printf( "Allocating pages: %i pages requested", n );
     
+    /* Checks if the number of pages may be allocated from a low order */
     if( n <= ( 1 << ( __XEOS_MEM_ZONE_BUDDY_MAX_ORDER - 1 ) ) )
     {
-        /* Round number of requested pages to the next power of 2 */
+        /* Yes - Rounds the number of requested pages to the next power of 2 */
         n--;
         n |= n >> 1;
         n |= n >> 2;
@@ -110,6 +111,9 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
     }
     else
     {
+        /*
+         * No, rounds the number of pages so it fits the block size of the highest order
+         */
         x  = n / ( 1 << ( __XEOS_MEM_ZONE_BUDDY_MAX_ORDER - 1 ) );
         x += ( ( n % ( 1 << ( __XEOS_MEM_ZONE_BUDDY_MAX_ORDER - 1 ) ) ) > 0 ) ? 1 : 0;
         n  = x * ( 1 << ( __XEOS_MEM_ZONE_BUDDY_MAX_ORDER - 1 ) );
@@ -120,6 +124,7 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
     order = 0;
     x     = n;
     
+    /* Finds the starting order in which to allocate the pages */
     while( x >>= 1 )
     {
         if( order >= __XEOS_MEM_ZONE_BUDDY_MAX_ORDER - 1 )
@@ -137,10 +142,12 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
     zoneIndex = 0;
     zone      = XEOS_Mem_GetZoneAtIndex( zoneIndex );
     
+    /* Process each memory zone to find a suitable one for the allocation */
     while( zone != NULL )
     {
         printf( "Processing memory zone %u: ", zoneIndex + 1 );
         
+        /* Only process usable memory zones */
         if( zone->type != XEOS_Mem_ZoneTypeUsable )
         {
             printf( "unusable memory zone\n" );
@@ -154,54 +161,85 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
         
         printf( "usable memory zone\n" );
         
+        /* Gets the zone base address */
         address = zone->base;
+        
+        /* Gets the buddy for the requested order */
         buddy   = &( zone->buddies[ order ] );
         
+        /* Checks if the order has free blocks */
         if( buddy->nFreeBlocks > 0 )
         {
             printf( "    *** Buddy %i has free blocks (%llu/%llu)\n", order, buddy->nFreeBlocks, buddy->nBlocks );
             
+            /* Pointer to the blocks data */
             blocks = buddy->blocks;
             
+            /* Process each block of the order */
             for( i = 0; i < buddy->nBlocks; i++ )
             {
+                /*
+                 * Checks if all blocks in the current group are used
+                 * (block infos are stored as 32 bits integers)
+                 */
                 if( *( blocks ) == 0 )
                 {
-                    blocks++;
-                    
                     printf( "    *** Skipping used blocks #%llu -> #%llu (0x%llX -> 0x%llX)\n", i, i + ( 31 - ( i % 32 ) ), address - ( uint64_t )XEOS_Mem, ( address + 0x1000 * ( 31 - ( i % 32 ) ) ) - ( uint64_t )XEOS_Mem );
                     
+                    /* Yes - We can process the next block group */
+                    blocks++;
+                    
+                    /* Adjust current address, so used blocks are skipped */
                     address += 0x1000 * ( 32 - ( i % 32 ) );
-                    i       += 31 - ( i % 32 );
+                    
+                    /* Adjusts the loop counter, so used blocks are skipped */
+                    i += 31 - ( i % 32 );
                     
                     continue;
                 }
                 
                 printf( "    *** Processing block #%llu: ", i );
                 
-                set     = ( 8 * ( 1 + ( i % 32 ) / 8 ) ) - ( 1 + ( i % 32 ) % 8 );
+                /* Bit position for the atomic operation */
+                set = ( int32_t )( ( i / 8 ) * 8 ) + ( int32_t )( 7 - ( i % 8 ) ); /* ( 8 * ( 1 + ( i % 32 ) / 8 ) ) - ( 1 + ( i % 32 ) % 8 ) */
+                
+                /* Number of blocks to allocate in the order */
                 nBlocks = ( n * 0x1000 ) / buddy->blockSize;
                 
+                /* Tries to mark the first block as used */
                 if( System_Atomic_TestAndClear( ( uint32_t )set, blocks ) == true )
                 {
+                    /* Success, decrements the number of free blocks */
                     System_Atomic_Decrement64( ( volatile int64_t * )&( buddy->nFreeBlocks ) );
                     
                     printf( "Free - Allocation successfull at 0x%llX\n", address - ( uint64_t )XEOS_Mem );
                     
+                    /* One block has successfully been allocated */
                     nBlocks--;
                     
+                    /* Continues trying to allocated blocks till we allocated enough */
                     while( nBlocks-- > 0 )
-                    {}
+                    {
+                        #pragma mark -
+                        #pragma mark !!! To-Do: try to allocate remaining blocks
+                        #pragma mark -
+                    }
                     
                     Buddy_Debug_PrintBuddies( zoneIndex );
                     
+                    /* Return the allocated memory address */
                     return address;
                 }
                 
                 printf( "Used - Cannot allocate (0x%llX)\n", address - ( uint64_t )XEOS_Mem );
                 
-                address += 0x1000;
+                /* Adjusts the address to the next block */
+                address += buddy->blockSize;
                 
+                /*
+                 * Block infos are stored as 32 bits integers - Process
+                 * next block group when applicable
+                 */
                 if( i > 0 && ( i % 31 ) == 0 )
                 {
                     blocks++;
@@ -211,12 +249,21 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
         
         printf( "    *** No free block in buddy %i - Split required\n", order );
         
+        /*
+         * Since we're here, it means we failed to allocate memory from
+         * the requested order. So we'll try to split a block from a bigger
+         * order to fulfill the allocation.
+         */
+        
         split = false;
         
+        /* Process each bigger orders */
         for( i = order + 1; i < __XEOS_MEM_ZONE_BUDDY_MAX_ORDER; i++ )
         {
+            /* Gets the buddy for the requested order */
             buddy = &( zone->buddies[ i ] );
             
+            /* Checks if the order has free blocks */
             if( buddy->nFreeBlocks == 0 )
             {
                 printf( "    *** Buddy %llu has no free blocks\n", i );
@@ -226,16 +273,24 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
             
             printf( "    *** Buddy %llu has free blocks (%llu/%llu)\n", i, buddy->nFreeBlocks, buddy->nBlocks );
             
+            /* Pointer to the blocks data */
             blocks = buddy->blocks;
             
+            /* Process each block of the current order */
             for( j = 0; j < buddy->nBlocks; j++ )
             {
+                /*
+                 * Checks if all blocks in the current group are used
+                 * (block infos are stored as 32 bits integers)
+                 */
                 if( *( blocks ) == 0 )
                 {
-                    blocks++;
-                    
                     printf( "    *** Skipping used blocks #%llu -> #%llu\n", j, j + ( 31 - ( j % 32 ) ) );
                     
+                    /* Yes - We can process the next block group */
+                    blocks++;
+                    
+                    /* Adjusts the loop counter, so used blocks are skipped */
                     j += 31 - ( j % 32 );
                     
                     continue;
@@ -243,14 +298,21 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
                 
                 printf( "    *** Processing block #%llu: ", i );
                 
-                set = ( 8 * ( 1 + ( j % 32 ) / 8 ) ) - ( 1 + ( j % 32 ) % 8 );
+                /* Bit position for the atomic operation */
+                set = ( int32_t )( ( j / 8 ) * 8 ) + ( int32_t )( 7 - ( j % 8 ) ); /* ( 8 * ( 1 + ( j % 32 ) / 8 ) ) - ( 1 + ( j % 32 ) % 8 ) */
                 
+                /* Tries to mark the block as used */
                 if( System_Atomic_TestAndClear( ( uint32_t )set, blocks ) == true )
                 {
+                    /* Success, decrements the number of free blocks */
                     System_Atomic_Decrement64( ( volatile int64_t * )&( buddy->nFreeBlocks ) );
                     
                     printf( "Free\n" );
                     
+                    /*
+                     * We can now split the block we just marked as used so blocks
+                     * from lower orders can be marked as free
+                     */
                     split = true;
                     
                     break;
@@ -258,14 +320,20 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
                 
                 printf( "Used - Cannot split\n" );
                 
+                /*
+                 * Block infos are stored as 32 bits integers - Process
+                 * next block group when applicable
+                 */
                 if( j > 0 && ( j % 31 ) == 0 )
                 {
                     blocks++;
                 }
             }
             
+            /* Checks if we've successfully marked a block as used */
             if( split == true )
             {
+                /* Process each lower orders till the one requested originally */
                 for( k = 0; k < i - order; k++ )
                 {
                     printf( "    *** Splitting block #%llu of buddy %llu\n", j, i - k );
@@ -276,7 +344,8 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
                     blocks  = buddy->blocks;
                     blocks += j / 32;
                     
-                    set = ( 8 * ( 1 + ( ( j % 32 ) + 1 ) / 8 ) ) - ( 1 + ( ( j % 32 ) + 1 ) % 8 );
+                    /* Bit position for the atomic operation */
+                    set = ( int32_t )( ( j / 8 ) * 8 ) + ( int32_t )( 7 - ( j % 8 ) ); /* ( 8 * ( 1 + ( j % 32 ) / 8 ) ) - ( 1 + ( j % 32 ) % 8 ) */
                     
                     System_Atomic_TestAndSet( ( uint32_t )set, blocks );
                     System_Atomic_Increment64( ( volatile int64_t * )&( buddy->nFreeBlocks ) );
