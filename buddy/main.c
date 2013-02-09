@@ -74,11 +74,7 @@
 int main( void )
 {
     Buddy_Setup_Memory();
-    
-    printf( "--------------------------------------------------------------------------------\n" );
-    
     Buddy_Setup_Buddies();
-    
     Buddy_Debug_PrintBuddies( 3 );
     
     XEOS_Mem_AllocPages( 65 );

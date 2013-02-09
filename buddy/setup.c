@@ -275,6 +275,8 @@ void Buddy_Setup_Memory( void )
         
         printf( "0x%016llX -> 0x%016llX: %s - %lli B\n", ( uint64_t )( zone->base - ( uint64_t )XEOS_Mem ), ( uint64_t )( zone->base - ( uint64_t )XEOS_Mem ) + zone->length - 1, typeString, zone->length );
     }
+    
+    printf( "--------------------------------------------------------------------------------\n" );
 }
 
 void Buddy_Setup_Buddies( void )
