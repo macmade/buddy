@@ -71,6 +71,13 @@
 #include <stdio.h>
 #include <string.h>
 
+static void __exit( void ) __attribute__( ( destructor ) );
+static void __exit( void )
+{
+    free( XEOS_Mem );
+    free( XEOS_Mem_Z1 );
+}
+
 void Buddy_Setup_Memory( void )
 {
     uint64_t          i;
@@ -85,13 +92,13 @@ void Buddy_Setup_Memory( void )
     uint64_t          nPages;
     uint64_t          blockSize;
     char            * typeString;
+    uint64_t          z1Length;
+    uint64_t          z2Length;
+    uint64_t          z3Length;
+    uint64_t          z4Length;
+    uint64_t          z5Length;
     
-    uint64_t z1Length;
-    uint64_t z2Length;
-    uint64_t z3Length;
-    uint64_t z4Length;
-    uint64_t z5Length;
-    
+    /* Init */
     type     = XEOS_Mem_ZoneTypeUnknown;
     length   = 0;
     base     = 0;
@@ -100,22 +107,24 @@ void Buddy_Setup_Memory( void )
     z3Length = 0;
     z4Length = 0;
     z5Length = 0;
-    
-	XEOS_Mem = malloc( MEM );
-    
-    printf( "--------------------------------------------------------------------------------\n" );
-    printf( "XEOS:         Buddy physical memory allocator\n" );
-	printf( "Total memory: %llu MB (%llu B) at %p\n", ( unsigned long long )( ( MEM / 1024 ) / 1024 ), ( unsigned long long )MEM, XEOS_Mem );
-    printf( "--------------------------------------------------------------------------------\n" );
-	
     zonesMem = 0;
     
     /***************************************************************************
-     * ZONES MEMORY USAGE
+     * Initialization
      **************************************************************************/
     
+    /* Allocates memory, faking physical memory */
+    XEOS_Mem = malloc( MEM );
+    
+    printf( "--------------------------------------------------------------------------------\n" );
+    printf( "XEOS:         Buddy physical memory allocator\n" );
+    printf( "Total memory: %llu MB (%llu B) at %p\n", ( unsigned long long )( ( MEM / 1024 ) / 1024 ), ( unsigned long long )MEM, XEOS_Mem );
+    printf( "--------------------------------------------------------------------------------\n" );
+    
+    /* Computes and prints the zones memory usage */
     for( i = 0; i < 5; i++ )
     {
+        /* Zone selection (typical layout of 5 zones) */
         if( i == 0 )
         {
             length  = Z1_BYTES;
@@ -137,14 +146,20 @@ void Buddy_Setup_Memory( void )
             length  = Z5_BYTES;
         }
         
-        nPages      = length / 0x1000;
-        zoneMem     = 0;
-        blockSize   = 0x1000;
+        /* Number of pages for the current zone */
+        nPages = length / 0x1000;
+        
+        /* First buddy has 4KB blocks */
+        blockSize = 0x1000;
         
         printf( "Memory zone %llu - ", i + 1 );
         printf( "Length:      %llu KB\n", length / 1024 );
         printf( "              - Pages:       %llu\n", nPages );
         
+        /* Memory needed to store informations for the current zone */
+        zoneMem = 0;
+        
+        /* Prints buddy infos for each zone */
         for( j = 0; j < __XEOS_MEM_ZONE_BUDDY_MAX_ORDER; j++ )
         {
             {
@@ -163,14 +178,21 @@ void Buddy_Setup_Memory( void )
                 
                 printf( "              - Buddy %llu:     %llu blocks of %llu KB\n", j, nBlocks, blockSize / 1024 );
                 
+                /* Block size for the next buddy */
                 blockSize *= 2;
-                zoneMem   += buddyMem;
+                
+                /* Memory needed to store buddy infos */
+                zoneMem += buddyMem;
             }
         }
         
+        /* Total memory needed for the current zone */
         zoneMem  += sizeof( struct __XEOS_Mem_Zone );
+        
+        /* Adds current zone memory to the total for all zones */
         zonesMem += zoneMem;
         
+        /* Keep lengths for all zones */
         if( i == 0 )
         {
             z1Length = zoneMem;
@@ -199,15 +221,17 @@ void Buddy_Setup_Memory( void )
     printf( "Zones memory: %llu KB (%llu B)\n", zonesMem / 1024, zonesMem );
     printf( "--------------------------------------------------------------------------------\n" );
     
+    /* Allocates continuous memory for all memory zones */
     XEOS_Mem_Z1 = malloc( zonesMem );
+    
+    /* Init */
     memset( XEOS_Mem_Z1, 0, zonesMem );
     
+    /* Keeps a pointer for each zones */
     XEOS_Mem_Z2 = ( void * )( ( uint64_t )XEOS_Mem_Z1 + z1Length );
     XEOS_Mem_Z3 = ( void * )( ( uint64_t )XEOS_Mem_Z2 + z2Length );
     XEOS_Mem_Z4 = ( void * )( ( uint64_t )XEOS_Mem_Z3 + z3Length );
     XEOS_Mem_Z5 = ( void * )( ( uint64_t )XEOS_Mem_Z4 + z4Length );
-    
-    previousZone = NULL;
     
     /***************************************************************************
      * ZONES SETUP
@@ -215,8 +239,12 @@ void Buddy_Setup_Memory( void )
     
     printf( "Memory zones:\n\n" );
     
+    previousZone = NULL;
+    
+    /* Process each memory zone */
     for( i = 0; i < 5; i++ )
     {
+        /* Infos about the current zone */
         if( i == 0 )
         {
             base    = Z1_START;
@@ -248,19 +276,26 @@ void Buddy_Setup_Memory( void )
             type    = XEOS_Mem_ZoneTypeACPIReclaimable;
         }
         
+        /* Gets the current memory zone */
         zone = XEOS_Mem_GetZoneAtIndex( ( unsigned int )i );
         
+        /* Sets the previous zone pointer, if applicable */
         if( previousZone != NULL )
         {
             previousZone->next = zone;
             zone->prev         = previousZone;
         }
         
+        /* Fills zone informations */
         zone->type   = type;
         zone->base   = base + ( uint64_t )XEOS_Mem;
         zone->length = length;
         zone->nPages = length / 0x1000;
         
+        /* Keeps current zone for the next one */
+        previousZone = zone;
+        
+        /* Prints details about the current zone */
         switch( zone->type )
         {
             case XEOS_Mem_ZoneTypeUnknown:          typeString = "Unknown "; break;
@@ -270,10 +305,14 @@ void Buddy_Setup_Memory( void )
             case XEOS_Mem_ZoneTypeACPINVS:          typeString = "ACPI NVS"; break;
             case XEOS_Mem_ZoneTypeBad:              typeString = "Bad     "; break;
         }
-        
-        previousZone = zone;
-        
-        printf( "0x%016llX -> 0x%016llX: %s - %lli B\n", ( uint64_t )( zone->base - ( uint64_t )XEOS_Mem ), ( uint64_t )( zone->base - ( uint64_t )XEOS_Mem ) + zone->length - 1, typeString, zone->length );
+        printf
+        (
+            "0x%016llX -> 0x%016llX: %s - %lli B\n",
+            ( uint64_t )( zone->base - ( uint64_t )XEOS_Mem ),
+            ( uint64_t )( zone->base - ( uint64_t )XEOS_Mem ) + zone->length - 1,
+            typeString,
+            zone->length
+        );
     }
     
     printf( "--------------------------------------------------------------------------------\n" );
@@ -292,64 +331,105 @@ void Buddy_Setup_Buddies( void )
     uint64_t              buddyBlocks;
     volatile uint32_t   * buddyData;
     
+    /* Process each memory zone to setup the buddy system */
     for( i = 0; i < 5; i++ )
     {
         zone          = XEOS_Mem_GetZoneAtIndex( ( unsigned int )i );
         previousBuddy = NULL;
-
+        
+        /* First buddy has 4KB blocks */
         blockSize = 0x1000;
+        
+        /* Start of the block data for first buddy */
         blocks    = ( uint64_t )zone;
         blocks   += sizeof( struct __XEOS_Mem_Zone );
         
         printf( "Memory zone %llu - Address:      0x%llX\n", i + 1, ( long long )zone );
         printf( "              - Buddy blocks: 0x%llX\n", blocks );
         
+        /* Process each buddy order to set-up buddies */
         for( j = 0; j < __XEOS_MEM_ZONE_BUDDY_MAX_ORDER; j++ )
         {
+            /* Get the current buddy */
             buddy = &( zone->buddies[ j ] );
             
+            /* Sets the previous buddy pointer if applicable */
             if( previousBuddy != NULL )
             {
                 previousBuddy->next = buddy;
                 buddy->prev         = previousBuddy;
             }
             
+            /* Stores buddy infos */
             buddy->order     = j;
             buddy->blockSize = blockSize;
             buddy->nBlocks   = zone->length / blockSize;
             buddy->blocks    = ( buddy->nBlocks == 0 ) ? NULL : ( volatile uint32_t * )blocks;
             
+            /*
+             * Number of bytes used by the current buddy:
+             * A byte can store infos for 8 blocks, and block infos are stored
+             * as 32 bits integers
+             */
             buddyBlocks  = ( buddy->nBlocks / 8 ) + ( ( ( buddy->nBlocks % 8 ) > 0 ) ? 1 : 0 );
             buddyBlocks += ( ( buddyBlocks % 4 ) == 0 ) ? 0 : 4 - ( buddyBlocks % 4 );
             
-            printf( "              - Buddy %llu:      %llu blocks using %llu bytes describing %llu bytes\n", j, buddy->nBlocks, buddyBlocks, buddy->nBlocks * buddy->blockSize );
+            /* Prints infos about the current buddy */
+            printf
+            (
+                "              - Buddy %llu:      %llu blocks using %llu bytes describing %llu bytes\n",
+                j,
+                buddy->nBlocks,
+                buddyBlocks,
+                buddy->nBlocks * buddy->blockSize
+            );
             
+            /* Start of the block data for the next buddy */
             blocks += buddyBlocks;
             
+            /* Block size for the next buddy */
             blockSize *= 2;
         }
         
+        /* Number of blocks processed */
         buddyBlocks = 0;
         
+        /*
+         * Process each buddy order to set-up buddies. We begin from the
+         * biggest order, so we can mark blocks from big ordres as free, while
+         * sub-blocks from lower orders will be marked as used.
+         */
         for( j = __XEOS_MEM_ZONE_BUDDY_MAX_ORDER; j > 0; j-- )
         {
+            /* Get the current buddy */
             buddy = &( zone->buddies[ j - 1 ] );
             
+            /* No block in the current buddy */
             if( buddy->nBlocks == 0 )
             {
                 continue;
             }
             
+            /* Pointer to the blocks data */
             buddyData = buddy->blocks;
             
+            /*
+             * If we're processing the biggest order with available blocks,
+             * we can simply mark each of them as free.
+             */
             if( buddyBlocks == 0 )
             {
+                /* Process each block */
                 for( k = 0; k < buddy->nBlocks; k++ )
                 {
-                    *( buddyData ) |= 1 << ( k % 32 );
-                    
+                    /* Marks the current block as free */
+                    *( buddyData )     |= 1 << ( k % 32 );
                     buddy->nFreeBlocks += 1;
                     
+                    /*
+                     * Block infos are stored as 32 bits integers - Process
+                     * next block group when applicable
+                     */
                     if( k > 0 && ( k % 31 ) == 0 )
                     {
                         buddyData++;
@@ -358,6 +438,7 @@ void Buddy_Setup_Buddies( void )
             }
             else
             {
+                /* Skips blocks from the previous buddy order */
                 for( k = 0; k < buddyBlocks * 2; k++ )
                 {
                     if( k > 0 && ( k % 31 ) == 0 )
@@ -366,12 +447,17 @@ void Buddy_Setup_Buddies( void )
                     }
                 }
                 
+                /* We can now process the remaining blocks */
                 for( k = buddyBlocks * 2; k < buddy->nBlocks; k++ )
                 {
-                    *( buddyData ) |= 1 << ( k % 32 );
-                    
+                    /* Marks the current block as free */
+                    *( buddyData )     |= 1 << ( k % 32 );
                     buddy->nFreeBlocks += 1;
                     
+                    /*
+                     * Block infos are stored as 32 bits integers - Process
+                     * next block group when applicable
+                     */
                     if( k > 0 && ( k % 31 ) == 0 )
                     {
                         buddyData++;
@@ -379,6 +465,7 @@ void Buddy_Setup_Buddies( void )
                 }
             }
             
+            /* Number of blocks processed for the current buddy order */
             buddyBlocks = buddy->nBlocks;
         }
         

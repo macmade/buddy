@@ -73,13 +73,10 @@
 
 int main( void )
 {
+    /* Initial setup of a dummy physical memory layout */
     Buddy_Setup_Memory();
     Buddy_Setup_Buddies();
     Buddy_Debug_PrintBuddies( 3 );
-    
-    XEOS_Mem_AllocPages( 65 );
-    
-    printf( "Single page allocation:\n\n" );
     
     {
         uint64_t p1;
@@ -154,8 +151,7 @@ int main( void )
         printf( "--------------------------------------------------------------------------------\n" );
     }
     
-	free( XEOS_Mem );
-	free( XEOS_Mem_Z1 );
+    XEOS_Mem_AllocPages( 65 );
     
-	return 0;
+    return 0;
 }
