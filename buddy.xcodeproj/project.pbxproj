@@ -132,7 +132,7 @@
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 0450;
-				ORGANIZATIONNAME = eosgarden;
+				ORGANIZATIONNAME = XS-Labs;
 			};
 			buildConfigurationList = 05AE9A9A1674D48200D86835 /* Build configuration list for PBXProject "buddy" */;
 			compatibilityVersion = "Xcode 3.2";
