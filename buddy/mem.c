@@ -306,15 +306,25 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
                 {
                     printf( "    *** Splitting block #%llu of buddy %llu\n", j, i - k );
                     
+                    /* Block position in the lower order */
                     j *= 2;
                     
+                    /* Gets the buddy for the lower order */
                     buddy   = &( zone->buddies[ i - k - 1 ] );
+                    
+                    /* Pointer to the blocks data */
                     blocks  = buddy->blocks;
+                    
+                    /*
+                     * Adjusts the data pointer so it points to the block
+                     * to mark as free
+                     */
                     blocks += j / 32;
                     
                     /* Bit position for the atomic operation */
                     set = ( int32_t )( ( j / 8 ) * 8 ) + ( int32_t )( 7 - ( j % 8 ) ); /* ( 8 * ( 1 + ( j % 32 ) / 8 ) ) - ( 1 + ( j % 32 ) % 8 ) */
                     
+                    /* Sets the block as free */
                     System_Atomic_TestAndSet( ( uint32_t )set, blocks );
                     System_Atomic_Increment64( ( volatile int64_t * )&( buddy->nFreeBlocks ) );
                 }
@@ -328,9 +338,10 @@ uint64_t XEOS_Mem_AllocPages( unsigned int n )
             }
         }
         
-        zoneIndex++;
-        
+        /* Process the next zone */
         zone = zone->next;
+        
+        zoneIndex++;
     }
     
     return 0;
