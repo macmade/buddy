@@ -12,6 +12,7 @@
 		0578F36216C6283D00A84481 /* debug.c in Sources */ = {isa = PBXBuildFile; fileRef = 0578F36116C6283D00A84481 /* debug.c */; };
 		0578F36716C62C4500A84481 /* lib.c in Sources */ = {isa = PBXBuildFile; fileRef = 0578F35816C6214E00A84481 /* lib.c */; };
 		0578F36816C62C6500A84481 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 0578F35116C61FA100A84481 /* main.c */; };
+		057F83CC1942B29C003D04D8 /* README.md in Sources */ = {isa = PBXBuildFile; fileRef = 057F83CB1942B29C003D04D8 /* README.md */; };
 		05AE9AA51674D48200D86835 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 05AE9AA41674D48200D86835 /* Foundation.framework */; };
 		05AE9AB516752F9100D86835 /* mem.c in Sources */ = {isa = PBXBuildFile; fileRef = 05AE9AB416752F9100D86835 /* mem.c */; };
 /* End PBXBuildFile section */
@@ -42,6 +43,7 @@
 		0578F35E16C6273F00A84481 /* globals.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = globals.c; sourceTree = "<group>"; };
 		0578F36016C6283600A84481 /* debug.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = debug.h; sourceTree = "<group>"; };
 		0578F36116C6283D00A84481 /* debug.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = debug.c; sourceTree = "<group>"; };
+		057F83CB1942B29C003D04D8 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		05AE9AA01674D48200D86835 /* buddy */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = buddy; sourceTree = BUILT_PRODUCTS_DIR; };
 		05AE9AA41674D48200D86835 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		05AE9AB416752F9100D86835 /* mem.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mem.c; sourceTree = "<group>"; };
@@ -62,6 +64,7 @@
 		05AE9A951674D48200D86835 = {
 			isa = PBXGroup;
 			children = (
+				057F83CB1942B29C003D04D8 /* README.md */,
 				05AE9AA61674D48200D86835 /* buddy */,
 				05AE9AA31674D48200D86835 /* Frameworks */,
 				05AE9AA11674D48200D86835 /* Products */,
@@ -131,8 +134,8 @@
 		05AE9A971674D48200D86835 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0450;
-				ORGANIZATIONNAME = XS-Labs;
+				LastUpgradeCheck = 0600;
+				ORGANIZATIONNAME = "XS-Labs";
 			};
 			buildConfigurationList = 05AE9A9A1674D48200D86835 /* Build configuration list for PBXProject "buddy" */;
 			compatibilityVersion = "Xcode 3.2";
@@ -159,6 +162,7 @@
 				05AE9AB516752F9100D86835 /* mem.c in Sources */,
 				0578F35A16C6262E00A84481 /* setup.c in Sources */,
 				0578F35F16C6273F00A84481 /* globals.c in Sources */,
+				057F83CC1942B29C003D04D8 /* README.md in Sources */,
 				0578F36216C6283D00A84481 /* debug.c in Sources */,
 				0578F36716C62C4500A84481 /* lib.c in Sources */,
 				0578F36816C62C6500A84481 /* main.c in Sources */,
@@ -172,7 +176,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_WARN_EMPTY_BODY = YES;
@@ -201,7 +204,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_WARN_EMPTY_BODY = YES;

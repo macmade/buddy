@@ -1,6 +1,8 @@
 XEOS - Buddy
 ============
 
+[![Build Status](https://travis-ci.org/macmade/buddy.svg?branch=master)](https://travis-ci.org/macmade/buddy)
+
 About
 -----
 
